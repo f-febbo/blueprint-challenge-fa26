@@ -164,9 +164,9 @@ The backend must:
 
 ---
 
-## Starter Implementation Included
+## Running the application
 
-This repository now includes a starter full-stack implementation with:
+The application includes:
 
 - `frontend/` React + Vite UI for book list/search/filter, book creation, book detail, and checkout creation
 - `backend/` FastAPI REST API with PostgreSQL persistence for books and checkouts
@@ -184,6 +184,42 @@ Then open:
 
 - Frontend: [http://localhost:5173](http://localhost:5173)
 - Backend API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+
+### Run without Docker
+
+Use Python 3.12+ and Node.js 22. From the repository root:
+
+```bash
+python3 -m venv backend/.venv
+source backend/.venv/bin/activate
+python3 -m pip install -r backend/requirements.txt
+export DATABASE_URL='postgresql+psycopg2://postgres:postgres@localhost:5432/libraryconnect'
+uvicorn backend.app:app --reload
+```
+
+Create the PostgreSQL database first. Tables are created on backend startup.
+If `DATABASE_URL` is omitted, the backend uses a local SQLite file for quick development;
+Docker Compose uses PostgreSQL with a persistent volume.
+
+In a second terminal:
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+The frontend defaults to `http://localhost:8000` for API calls. Set
+`VITE_API_BASE_URL` before starting Vite or building to use another API address.
+The backend permits requests from the local frontend on port 5173.
+
+### Using the app
+
+- The catalog loads on startup. Title search is case-insensitive and combines with the genre filter.
+- Create Book saves a book and clears the filters so the new entry is visible.
+- View Details shows all book fields and checkout history, newest date first.
+- Selecting a book prefills the checkout selector. Notes may be left blank.
+- Failed saves keep the form values so staff can correct or retry them.
 
 ### Smoke Tests with curl
 
