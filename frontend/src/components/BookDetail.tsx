@@ -3,14 +3,15 @@ import type { Book, Checkout } from '../types'
 type BookDetailProps = {
   book: Book | null
   checkouts: Checkout[]
+  loading?: boolean
 }
 
-function BookDetail({ book, checkouts }: BookDetailProps) {
+function BookDetail({ book, checkouts, loading = false }: BookDetailProps) {
   if (!book) {
     return (
       <section className="card">
         <h2>Book Details</h2>
-        <p>Select a book from the list to view details.</p>
+        <p role={loading ? 'status' : undefined}>{loading ? 'Loading book details…' : 'Select a book from the list to view details.'}</p>
       </section>
     )
   }
@@ -31,6 +32,7 @@ function BookDetail({ book, checkouts }: BookDetailProps) {
       </dl>
 
       <h3>Checkouts</h3>
+      {checkouts.length === 0 && <p className="empty">No checkouts recorded for this book yet.</p>}
       <ul className="list">
         {checkouts.map((checkout) => (
           <li key={checkout.id} className="list-item">

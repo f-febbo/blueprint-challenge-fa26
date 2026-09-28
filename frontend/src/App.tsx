@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
+import * as api from './api/api'
 import CheckoutForm from './components/CheckoutForm'
 import BookDetail from './components/BookDetail'
 import BookForm from './components/BookForm'
@@ -7,19 +8,17 @@ import BookList from './components/BookList'
 import { GENRES, type Genre, type Checkout, type CheckoutFormValues, type Book, type BookFormValues } from './types'
 
 const initialBookForm: BookFormValues = {
-  title: '',
-  genre: 'Fiction',
-  description: '',
-  author: '',
-  publisher_email: '',
-  shelf_location: '',
+  title: '', genre: 'Fiction', description: '', author: '', publisher_email: '', shelf_location: '',
 }
 
-const initialCheckoutForm: CheckoutFormValues = {
-  patron_name: '',
-  book_id: '',
-  date: new Date().toISOString().slice(0, 10),
-  notes: '',
+function newCheckoutForm(bookId = ''): CheckoutFormValues {
+  const today = new Date()
+  const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  return { patron_name: '', book_id: bookId, date, notes: '' }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Something went wrong. Please try again.'
 }
 
 function App() {
@@ -29,95 +28,160 @@ function App() {
   const [search, setSearch] = useState('')
   const [genreFilter, setGenreFilter] = useState<Genre | 'All'>('All')
   const [bookForm, setBookForm] = useState<BookFormValues>(initialBookForm)
-  const [checkoutForm, setCheckoutForm] = useState<CheckoutFormValues>(initialCheckoutForm)
+  const [checkoutForm, setCheckoutForm] = useState<CheckoutFormValues>(() => newCheckoutForm())
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [loadVersion, setLoadVersion] = useState(0)
+  const [loadingDetail, setLoadingDetail] = useState(false)
+  const [savingBook, setSavingBook] = useState(false)
+  const [savingCheckout, setSavingCheckout] = useState(false)
+  const selectionVersion = useRef(0)
 
-  async function handleLoadBooks() {
-    void search
-    void genreFilter
-    void setBooks
-    // TODO: Implement book list loading using src/api/api.ts.
-    setError('TODO: implement handleLoadBooks in App.tsx')
+  useEffect(() => {
+    let active = true
+    api.listBooks().then((result) => {
+      if (active) setBooks(result)
+    }).catch((error: unknown) => {
+      if (active) setLoadError(errorMessage(error))
+    }).finally(() => {
+      if (active) setLoading(false)
+    })
+    return () => { active = false }
+  }, [loadVersion])
+
+  function retryLoad() {
+    setLoading(true)
+    setLoadError(null)
+    setLoadVersion((version) => version + 1)
   }
 
   async function handleSelectBook(bookId: number) {
-    void bookId
-    void setSelectedBook
-    void setBookCheckouts
-    void setCheckoutForm
-    // TODO: Implement selected book + checkouts fetch using src/api/api.ts.
-    setError('TODO: implement handleSelectBook in App.tsx')
-  }
-
-  function handleBookFormChange(next: BookFormValues) {
-    void next
-    // TODO: Implement book form state handling.
-    setError('TODO: implement book form state updates in App.tsx')
-  }
-
-  function handleCheckoutFormChange(next: CheckoutFormValues) {
-    void next
-    // TODO: Implement checkout form state handling.
-    setError('TODO: implement checkout form state updates in App.tsx')
+    const version = ++selectionVersion.current
+    setError(null)
+    setNotice('')
+    setSelectedBook(null)
+    setBookCheckouts([])
+    setLoadingDetail(true)
+    try {
+      const [book, checkouts] = await Promise.all([api.getBook(bookId), api.listBookCheckouts(bookId)])
+      if (version !== selectionVersion.current) return
+      setSelectedBook(book)
+      setBookCheckouts(checkouts)
+      setCheckoutForm((form) => ({ ...form, book_id: String(book.id) }))
+    } catch (error) {
+      if (version === selectionVersion.current) setError(errorMessage(error))
+    } finally {
+      if (version === selectionVersion.current) setLoadingDetail(false)
+    }
   }
 
   async function handleCreateBook() {
-    void bookForm
-    void setBookForm
-    // TODO: Implement book creation flow using src/api/api.ts.
-    setError('TODO: implement handleCreateBook in App.tsx')
+    if (savingBook) return
+    setSavingBook(true)
+    setError(null)
+    setNotice('')
+    try {
+      const book = await api.createBook({
+        ...bookForm,
+        title: bookForm.title.trim(),
+        description: bookForm.description.trim(),
+        author: bookForm.author.trim(),
+        publisher_email: bookForm.publisher_email.trim(),
+        shelf_location: bookForm.shelf_location.trim(),
+      })
+      setBooks((current) => [...current, book])
+      setBookForm(initialBookForm)
+      setSearch('')
+      setGenreFilter('All')
+      setNotice(`Added ${book.title} to the catalog.`)
+    } catch (error) {
+      setError(errorMessage(error))
+    } finally {
+      setSavingBook(false)
+    }
   }
 
   async function handleCreateCheckout() {
-    void checkoutForm
-    void selectedBook
-    void setCheckoutForm
-    // TODO: Implement checkout creation flow using src/api/api.ts.
-    setError('TODO: implement handleCreateCheckout in App.tsx')
+    if (savingCheckout) return
+    const version = selectionVersion.current
+    setSavingCheckout(true)
+    setError(null)
+    setNotice('')
+    try {
+      const checkout = await api.createCheckout({
+        ...checkoutForm, patron_name: checkoutForm.patron_name.trim(), notes: checkoutForm.notes.trim(),
+      })
+      if (selectedBook?.id === checkout.book_id && version === selectionVersion.current) {
+        setBookCheckouts((current) => [...current, checkout].sort((a, b) =>
+          b.date.localeCompare(a.date) || b.id - a.id))
+      }
+      setCheckoutForm(newCheckoutForm(String(checkout.book_id)))
+      setNotice(`Checkout recorded for ${checkout.patron_name}.`)
+    } catch (error) {
+      setError(errorMessage(error))
+    } finally {
+      setSavingCheckout(false)
+    }
   }
+
+  const visibleBooks = books.filter((book) =>
+    book.title.toLowerCase().includes(search.trim().toLowerCase()) &&
+    (genreFilter === 'All' || book.genre === genreFilter))
 
   return (
     <main className="layout">
-      <header>
+      <header className="page-header">
+        <p className="eyebrow">LibraryConnect</p>
         <h1>LibraryConnect Resource Hub</h1>
-        <p>Starter frontend scaffold with TODOs for API integration.</p>
+        <p>Browse the catalog, add books, and keep track of patron checkouts.</p>
       </header>
 
-      {error ? <p className="error">{error}</p> : null}
+      {error && <p className="error" role="alert">{error}</p>}
+      {notice && <p className="notice" role="status">{notice}</p>}
+      {loadError && (
+        <div className="error" role="alert">
+          <p>{loadError}</p>
+          <button onClick={retryLoad}>Retry loading books</button>
+        </div>
+      )}
 
-      <section className="card">
-        <h2>Integration TODO</h2>
-        <p>
-          Route handlers, form wiring, and API calls are intentionally left as TODOs for the team.
-        </p>
-        <button onClick={() => void handleLoadBooks()}>Load Books (TODO API)</button>
-      </section>
-
-      <BookList
-        books={books}
-        search={search}
-        genreFilter={genreFilter}
-        onSearchChange={setSearch}
-        onGenreChange={setGenreFilter}
-        onSelectBook={(bookId) => void handleSelectBook(bookId)}
-        genres={GENRES}
-      />
-
-      <BookForm
-        values={bookForm}
-        genres={GENRES}
-        onChange={handleBookFormChange}
-        onSubmit={() => void handleCreateBook()}
-      />
-
-      <BookDetail book={selectedBook} checkouts={bookCheckouts} />
-
-      <CheckoutForm
-        values={checkoutForm}
-        books={books}
-        onChange={handleCheckoutFormChange}
-        onSubmit={() => void handleCreateCheckout()}
-      />
+      <div className="workspace">
+        <div className="column">
+          <BookList
+            books={visibleBooks}
+            search={search}
+            genreFilter={genreFilter}
+            onSearchChange={setSearch}
+            onGenreChange={setGenreFilter}
+            onSelectBook={(bookId) => void handleSelectBook(bookId)}
+            genres={GENRES}
+            loading={loading}
+            unavailable={!!loadError}
+            disabled={savingCheckout}
+          />
+          <BookDetail book={selectedBook} checkouts={bookCheckouts} loading={loadingDetail} />
+        </div>
+        <div className="column">
+          <BookForm
+            values={bookForm}
+            genres={GENRES}
+            onChange={setBookForm}
+            onSubmit={() => void handleCreateBook()}
+            submitting={savingBook}
+            disabled={loading || !!loadError}
+          />
+          <CheckoutForm
+            values={checkoutForm}
+            books={books}
+            onChange={setCheckoutForm}
+            onSubmit={() => void handleCreateCheckout()}
+            submitting={savingCheckout}
+            disabled={loading || !!loadError || loadingDetail || books.length === 0}
+          />
+        </div>
+      </div>
     </main>
   )
 }
