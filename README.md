@@ -216,10 +216,11 @@ The backend permits requests from the local frontend on port 5173.
 ### Using the app
 
 - The catalog loads on startup. Title search is case-insensitive and combines with the genre filter.
-- Create Book saves a book and clears the filters so the new entry is visible.
-- View Details shows all book fields and checkout history, newest date first.
-- Selecting a book prefills the checkout selector. Notes may be left blank.
+- Add a book opens a separate creation page. Saving returns to the catalog and clears its filters so the new entry is visible.
+- View Details opens a dedicated book page with its fields and checkout history, newest date first.
+- Record checkout is available from a book’s detail page. It opens a separate form tied to that book; notes may be left blank.
 - Failed saves keep the form values so staff can correct or retry them.
+- Catalog, new-book, detail, and checkout pages have bookmarkable hash URLs and support browser Back and Forward.
 
 ### Smoke Tests with curl
 
