@@ -1,3 +1,6 @@
+import ActionButton from './ActionButton'
+import Icon from './Icon'
+import Spinner from './Spinner'
 import type { CheckoutFormValues, Book } from '../types'
 
 type CheckoutFormProps = {
@@ -7,16 +10,17 @@ type CheckoutFormProps = {
   onSubmit: () => void
   submitting?: boolean
   disabled?: boolean
+  lockBook?: boolean
 }
 
-function CheckoutForm({ values, books, onChange, onSubmit, submitting = false, disabled = false }: CheckoutFormProps) {
+function CheckoutForm({ values, books, onChange, onSubmit, submitting = false, disabled = false, lockBook = false }: CheckoutFormProps) {
   function update<K extends keyof CheckoutFormValues>(key: K, value: CheckoutFormValues[K]) {
     onChange({ ...values, [key]: value })
   }
 
   return (
     <section className="card">
-      <h2>Create Checkout</h2>
+      <h2 className="visually-hidden">Create Checkout</h2>
 
       <form onSubmit={(event) => { event.preventDefault(); onSubmit() }}>
         <fieldset className="form-grid" disabled={submitting || disabled}>
@@ -33,6 +37,7 @@ function CheckoutForm({ values, books, onChange, onSubmit, submitting = false, d
           <label htmlFor="checkout-book">Book</label>
           <select
             id="checkout-book"
+            disabled={lockBook}
             required
             value={values.book_id}
             onChange={(event) => update('book_id', event.target.value)}
@@ -60,7 +65,8 @@ function CheckoutForm({ values, books, onChange, onSubmit, submitting = false, d
             value={values.notes}
             onChange={(event) => update('notes', event.target.value)}
           />
-          <button type="submit">{submitting ? 'Saving checkout…' : 'Create Checkout'}</button>
+          <ActionButton type="submit" disabled={submitting}>
+            {submitting ? <Spinner /> : <Icon name="check" />}{submitting ? 'Saving checkout…' : 'Create Checkout'}</ActionButton>
         </fieldset>
       </form>
     </section>

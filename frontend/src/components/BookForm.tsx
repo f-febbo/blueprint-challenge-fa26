@@ -1,3 +1,6 @@
+import ActionButton from './ActionButton'
+import Icon from './Icon'
+import Spinner from './Spinner'
 import type { BookFormValues, Genre } from '../types'
 
 type BookFormProps = {
@@ -16,7 +19,7 @@ function BookForm({ values, genres, onChange, onSubmit, submitting = false, disa
 
   return (
     <section className="card">
-      <h2>Create Book</h2>
+      <h2 className="visually-hidden">Create Book</h2>
 
       <form onSubmit={(event) => { event.preventDefault(); onSubmit() }}>
         <fieldset className="form-grid" disabled={submitting || disabled}>
@@ -79,7 +82,8 @@ function BookForm({ values, genres, onChange, onSubmit, submitting = false, disa
             value={values.shelf_location}
             onChange={(event) => update('shelf_location', event.target.value)}
           />
-          <button type="submit">{submitting ? 'Saving book…' : 'Create Book'}</button>
+          <ActionButton type="submit" disabled={submitting}>
+            {submitting ? <Spinner /> : <Icon name="plus" />}{submitting ? 'Saving book…' : 'Create Book'}</ActionButton>
         </fieldset>
       </form>
     </section>
